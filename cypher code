@@ -1,0 +1,18 @@
+// This Cypher code creates the graph projection positiveRatingsGraph with the filtered ratings (rating >= 6)
+ in Neo4j using the Graph Data Science library.
+CALL gds.graph.project.cypher(
+  'positiveRatingsGraph',
+  'MATCH (n) WHERE n:User OR n:Book RETURN id(n) AS id',
+  'MATCH (u:User)-[r:RATED]->(b:Book) WHERE r.rating >= 6 RETURN id(u) AS source, id(b) AS target, r.rating AS rating',
+  {validateRelationships: true}
+);
+
+//  run the Louvain community detection algorithm
+CALL gds.louvain.write(
+  'positiveRatingsGraph',
+  {
+    writeProperty: 'community',
+    relationshipWeightProperty: 'rating'
+  }
+)
+YIELD communityCount, modularity;
