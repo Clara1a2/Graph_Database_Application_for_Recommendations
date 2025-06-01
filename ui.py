@@ -157,7 +157,7 @@ if st.button("🚀 Recommend Books"):
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp_file:
         path = tmp_file.name
-        net.show(path)
+        net.show(path, notebook=False)
     with open(path, "r", encoding="utf-8") as f:
         html_content = f.read()
     components.html(html_content, height=700, scrolling=True)
