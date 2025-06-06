@@ -1,4 +1,5 @@
 from neo4j import GraphDatabase
+# zeit messen, code separat, keine emoji
 
 # Verbindung zu Neo4j aufbauen
 uri = "bolt://localhost:7687"
@@ -79,63 +80,29 @@ def run_graphsage_write(tx):
     YIELD nodePropertiesWritten
     """)
 
-def clean_invalid_embeddings(tx):
-    print("🧼 Entferne leere oder ungültige Embeddings...")
-    tx.run("""
-    MATCH (u:User)
-    WHERE u.graphsageFeature IS NULL OR size(u.graphsageFeature) = 0
-    REMOVE u.graphsageFeature
-    """)
 
-def clean_graphsage_embeddings(tx):
-    print("🧼 Entferne Embeddings mit null-Elementen...")
-    tx.run("""
-    MATCH (u:User)
-    WHERE ANY(val IN u.graphsageFeature WHERE val IS NULL)
-    REMOVE u.graphsageFeature
-    """)
-
-    print("🧼 Entferne leere oder zu kurze Embeddings...")
-    tx.run("""
-    MATCH (u:User)
-    WHERE u.graphsageFeature IS NULL OR size(u.graphsageFeature) < 5
-    REMOVE u.graphsageFeature
-    """)
-
-def clean_graphsage_feature(tx):
-    print("🧼 Bereinige 'graphsageFeature' und schreibe nach 'cleanedFeature' (ohne APOC)...")
-
-    tx.run("""
-    MATCH (u:User)
-    WHERE u.graphsageFeature IS NOT NULL AND size(u.graphsageFeature) > 0
-      AND NONE(x IN u.graphsageFeature WHERE x IS NULL)
-    SET u.cleanedFeature = u.graphsageFeature
-    """)
-
-    tx.run("""
-    MATCH (u:User)
-    WHERE size(u.cleanedFeature) < 5
-    REMOVE u.cleanedFeature
-    """)
-
-# Sichere Embeddings extrahieren (nulls rausfiltern)
 def clean_embeddings_strict(tx):
     print("🧼 Bereinige 'graphsageFeature' → 'cleanedFeature'...")
+
+    # Nur vollständig numerische, saubere Vektoren übernehmen
     tx.run("""
     MATCH (u:User)
     WHERE u.graphsageFeature IS NOT NULL
-      AND size(u.graphsageFeature) > 0
+      AND size(u.graphsageFeature) >= 5
       AND NONE(x IN u.graphsageFeature WHERE x IS NULL)
+      AND ALL(x IN u.graphsageFeature WHERE x + 0 = x)
     SET u.cleanedFeature = u.graphsageFeature
     """)
 
+    # Und zusätzlich alle zu kurzen cleanedFeature löschen (Backup)
     tx.run("""
     MATCH (u:User)
-    WHERE size(u.cleanedFeature) < 5
+    WHERE u.cleanedFeature IS NULL OR size(u.cleanedFeature) < 5
     REMOVE u.cleanedFeature
     """)
 
-def project_knn_graph(tx):
+
+def project_knn_graph_a(tx):
     print("📦 Erstelle KNN-Projektion nur mit sauberen Vektoren...")
 
     tx.run("""
@@ -158,7 +125,37 @@ def project_knn_graph(tx):
     )
     """)
 
-# KNN ausführen & SIMILAR_TO-Kanten schreiben
+def project_knn_graph(tx):
+    print("📦 Erstelle KNN-Projektion nur mit sauberen Vektoren...")
+
+    # Bestehenden Graph löschen, falls vorhanden
+    tx.run("""
+    CALL gds.graph.exists('userGraph') YIELD exists
+    WITH exists
+    CALL apoc.do.when(
+        exists,
+        'CALL gds.graph.drop("userGraph") YIELD graphName RETURN graphName',
+        'RETURN "Kein Graph vorhanden" AS graphName',
+        {}
+    ) YIELD value RETURN value
+    """)
+
+    # Projektion mit sicherem Filter + toFloat-Konvertierung
+    tx.run("""
+    CALL gds.graph.project.cypher(
+        'userGraph',
+        '
+        MATCH (u:User)
+        WHERE u.cleanedFeature IS NOT NULL 
+          AND size(u.cleanedFeature) > 0 
+          AND NONE(x IN u.cleanedFeature WHERE x IS NULL)
+        RETURN id(u) AS id, [x IN u.cleanedFeature | toFloat(x)] AS graphsageFeature
+        ',
+        'RETURN null AS source, null AS target'
+    )
+    """)
+
+
 def run_knn(tx):
     print("🔍 Starte KNN...")
     result = tx.run("""
