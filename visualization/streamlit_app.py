@@ -228,7 +228,7 @@ if st.button("Recommend Books"):
 
     st.subheader("Graph Visualization")
     graph_data = rec.get_graph_data(selected_user['userId'])
-    net = build_graph(selected_user['userId'], graph_data, algo)
+    net = build_graph(graph_data, algo)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp_file:
         path = tmp_file.name
