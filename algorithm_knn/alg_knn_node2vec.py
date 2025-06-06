@@ -1,14 +1,8 @@
-# Beispielproblem:
-# Zwei Nutzer haben dieselben Bücher bewertet – aber einer gibt immer 5 Sterne,
-# der andere 1 Stern → FastRP behandelt sie trotzdem als ähnlich.
-
-# Ziel: Du möchtest für jeden User ähnlich bewertende User vorschlagen
-
 from neo4j import GraphDatabase
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
-password = "SuperPasswort"
+password = "SuperPasswort"  # Anpassen
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -30,7 +24,7 @@ def delete_existing_graph(tx, name="userGraph"):
     """
     return tx.run(query).data()
 
-def create_projection_fastrp(tx, name="userGraph"):
+def create_projection_node2vec(tx, name="userGraph"):
     query = f"""
     CALL gds.graph.project(
       '{name}',
@@ -48,13 +42,13 @@ def create_projection_fastrp(tx, name="userGraph"):
     return tx.run(query).data()
 
 # -------------------------
-# 2. FASTRP EMBEDDINGS
+# 2. NODE2VEC EMBEDDINGS
 # -------------------------
 
-def run_fastrp(tx, name="userGraph", dim=64):
+def run_node2vec(tx, name="userGraph", dim=128, embedding_property="embedding"):
     query = f"""
-    CALL gds.fastRP.write('{name}', {{
-      writeProperty: 'embedding',
+    CALL gds.node2vec.write('{name}', {{
+      writeProperty: '{embedding_property}',
       embeddingDimension: {dim},
       relationshipWeightProperty: 'rating'
     }})
@@ -95,7 +89,7 @@ def run_knn_write(tx, name="userGraph", top_k=5, similarity_cutoff=None):
 # 4. EMPFEHLUNG
 # -------------------------
 
-def get_recommended_books(tx, user_id=19, limit=10):
+def get_recommended_books(tx, user_id=8, limit=10):
     query = """
     MATCH (target:User {id: $userId})
     MATCH (target)-[:SIMILAR_TO]->(sim:User)-[r:RATED]->(book:Book)
@@ -111,7 +105,7 @@ def get_recommended_books(tx, user_id=19, limit=10):
 # 5. EVALUATION
 # -------------------------
 
-def evaluate_recommendations(tx, user_id=19, limit=10):
+def evaluate_recommendations(tx, user_id=8, limit=10):
     recommendations = get_recommended_books(tx, user_id, limit)
     query = """
     MATCH (u:User {id: $userId})-[:RATED]->(b:Book)
@@ -139,53 +133,36 @@ def run_full_pipeline():
         print("Lösche vorherige GDS-Projektion...")
         session.execute_write(delete_existing_graph)
 
-        print("Erstelle Projektion für FastRP...")
-        session.execute_write(create_projection_fastrp)
+        print("Erstelle Projektion für Node2Vec...")
+        session.execute_write(create_projection_node2vec)
 
-        print("Generiere FastRP Embeddings...")
-        session.execute_write(run_fastrp, dim=64)
+        print("Generiere Node2Vec Embeddings...")
+        session.execute_write(run_node2vec, dim=64)
 
         print("Neu-Projektion nur für Embedding-basierte KNN-Berechnung...")
         session.execute_write(delete_existing_graph)
-        print("Schreibe mit Dummy-Beziehung...")
-        session.execute_write(lambda tx: tx.run(f"""
+        session.execute_write(lambda tx: tx.run("""
             CALL gds.graph.project(
-                'userGraph',
-                ['User'],
-                {{
-                    DUMMY: {{
-                        type: 'DUMMY',
-                        orientation: 'UNDIRECTED'
-                    }}
-                }},
-                {{
-                    nodeProperties: ['embedding']
-                }}
+              'userGraph',
+              {
+                User: {
+                  properties: ['embedding']
+                }
+              },
+              {}
             );
-            """))
-        # session.execute_write(lambda tx: tx.run("""
-        #     CALL gds.graph.project.cypher(
-        #       'userGraph',
-        #       '
-        #         MATCH (u:User)
-        #         RETURN id(u) AS id,
-        #                coalesce([x IN u.embedding | coalesce(toFloat(x), 0.0)], [0.0, 0.0, 0.0, 0.0]) AS embedding
-        #       ',
-        #       'RETURN NULL AS source, NULL AS target',
-        #       { validateRelationships: false }
-        #     );
-        # """))
+        """))
 
         print("Starte KNN mit Parametern: topK=10, cutoff=0.75")
-        session.execute_write(run_knn_write, top_k=5, similarity_cutoff=0.75)
+        session.execute_write(run_knn_write, top_k=10, similarity_cutoff=0.75)
 
-        print("Empfohlene Bücher für User 19:")
-        books = session.execute_read(get_recommended_books, user_id=19)
+        print("Empfohlene Bücher für User 8:")
+        books = session.execute_read(get_recommended_books, user_id=8)
         for book in books:
             print("   ➤", book)
 
         print("Evaluation:")
-        eval_result = session.execute_read(evaluate_recommendations, user_id=19)
+        eval_result = session.execute_read(evaluate_recommendations, user_id=8)
         print("   ➤ Precision:", eval_result["precision"])
         print("   ➤ Recall:   ", eval_result["recall"])
         print("   ➤ Treffer: ", eval_result["true_positives"])
