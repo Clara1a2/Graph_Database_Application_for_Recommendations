@@ -1,4 +1,5 @@
 from neo4j import GraphDatabase
+from alg_knn_wo import delete_existing_graph_2, create_projection_fastrp, run_fastrp
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
@@ -71,6 +72,17 @@ def check_embedding_lengths(tx, expected_len=embedding_dimension):
 
 def run_pipeline():
     with driver.session() as session:
+        ############ aus anderer Datei ########
+        print("🚮 Lösche vorherige GDS-Projektion...")
+        session.execute_write(delete_existing_graph_2)
+
+        print("🧱 Erstelle Projektion für FastRP...")
+        session.execute_write(create_projection_fastrp)
+
+        print("🧠 Generiere FastRP Embeddings (dim=64)...")
+        session.execute_write(run_fastrp, dim=64)
+        ##############################################
+
         print("🔍 Überprüfe Länge der Embeddings:")
         stats = session.execute_read(check_embedding_lengths)
         for row in stats:
