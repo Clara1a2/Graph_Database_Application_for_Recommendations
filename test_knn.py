@@ -78,24 +78,20 @@ def run_pipeline(algorithm="fastrp"):
             ################# FastRP ###################
             print("🚮 Lösche vorherige GDS-Projektion...")
             session.execute_write(delete_existing_graph_2)
-
             print("🧱 Erstelle Projektion für FastRP...")
             session.execute_write(create_projection_fastrp)
-
             print("🧠 Generiere FastRP Embeddings (dim=64)...")
             session.execute_write(run_fastrp, dim=64)
+
         if algorithm == "graphsage":
             ################# GraphSAGE ###################
             print("🔍 Prüfe und setze fehlende age-Werte...")
             session.execute_write(check_and_fix_features)
-
             print("📦 Projiziere Graph für GraphSAGE...")
             session.execute_write(project_graphsage_graph)
-
             print("🧠 Berechne Embeddings mit GraphSAGE: Trainieren...")
             # Falls bereits existiert: CALL gds.beta.model.drop('my-sage-model') in neo4j Browser
             session.execute_write(run_graphsage_train)
-
             print("🧠 Berechne Embeddings mit GraphSAGE: Schreiben...")
             session.execute_write(run_graphsage_write)
 
@@ -103,10 +99,8 @@ def run_pipeline(algorithm="fastrp"):
             ################# Node2Vec ###################
             print("🚮 Lösche vorherige GDS-Projektion...")
             session.execute_write(delete_existing_graph_3)
-
             print("🧱 Erstelle Projektion für Node2Vec...")
             session.execute_write(create_projection_node2vec)
-
             print("🧠 Generiere Node2Vec Embeddings...")
             session.execute_write(run_node2vec, dim=64)
 
@@ -114,17 +108,14 @@ def run_pipeline(algorithm="fastrp"):
         stats = session.execute_read(check_embedding_lengths)
         for row in stats:
             print(f"   ➤ Länge: {row['len']} → {row['count']} Nutzer")
-
         print("\n🧹 Lösche alten GDS-Graphen:")
         session.execute_write(delete_existing_graph)
-
         print("📦 Projiziere User-Graph mit Dummy-Relation und Embeddings:")
         session.execute_write(create_graph_with_dummy_relation)
-
-        print("🤝 Führe KNN aus (topK=5, cutoff=0.8):")
+        print("🤝 Führe KNN aus (topK=20, cutoff=0.8):")
         session.execute_write(run_knn_write, top_k=20)
 
-        print("📚 Empfohlene Bücher für Nutzer 8:")
+        print("📚 Empfohlene Bücher für Nutzer 19:")
         books = session.execute_read(get_similar_books, user_id=19) # 11676
         for book in books:
             print(f"   ➤ {book['title']} ({book['avgRating']:.2f}, {book['votes']} Stimmen)")
