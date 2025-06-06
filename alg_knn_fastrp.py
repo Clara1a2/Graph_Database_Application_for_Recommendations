@@ -146,7 +146,7 @@ def run_full_pipeline():
         session.execute_write(run_fastrp, dim=64)
 
         print("📦 Neu-Projektion nur für Embedding-basierte KNN-Berechnung...")
-        session.execute_write(delete_existing_graph)
+        session.execute_write(delete_existing_graph_2)
         session.execute_write(lambda tx: tx.run("""
             CALL gds.graph.project.cypher(
               'userGraph',
@@ -179,83 +179,3 @@ def run_full_pipeline():
 if __name__ == "__main__":
     run_full_pipeline()
 
-
-
-
-################################### Version 1 (ohne Berechnung von Embedding) ###########
-# from neo4j import GraphDatabase
-#
-# uri = "bolt://localhost:7687"  # Anpassen
-# user = "neo4j"
-# password = "SuperPasswort"     # Anpassen
-#
-# driver = GraphDatabase.driver(uri, auth=(user, password))
-#
-# def run_query(tx, query, parameters=None):
-#     return list(tx.run(query, parameters or {}))
-#
-# with driver.session() as session:
-#     # 1. Lösche bestehenden GDS-Graphen
-#     session.run("""
-#     CALL gds.graph.exists('userGraph') YIELD exists
-#     WITH exists
-#     CALL apoc.do.when(
-#       exists,
-#       'CALL gds.graph.drop("userGraph") YIELD graphName RETURN graphName',
-#       'RETURN "Graph was not present" AS graphName',
-#       {}
-#     ) YIELD value
-#     RETURN value.graphName;
-#     """)
-#
-#     # 2. GDS-Projektion erstellen
-#     session.run("""
-#     CALL gds.graph.project(
-#       'userGraph',
-#       {
-#         User: {
-#           properties: ['embedding']
-#         }
-#       },
-#       {}
-#     );
-#     """)
-#
-#     # 3. KNN schreiben (ohne Threshold)
-#     session.run("""
-#     CALL gds.knn.write('userGraph', {
-#       nodeProperties: ['embedding'],
-#       topK: 5,
-#       writeRelationshipType: 'SIMILAR_TO',
-#       writeProperty: 'similarity'
-#     })
-#     YIELD nodesCompared, relationshipsWritten;
-#     """)
-#
-#     # Optional: Alternative mit Threshold
-#     session.run("""
-#     CALL gds.knn.write('userGraph', {
-#       nodeProperties: ['embedding'],
-#       topK: 5,
-#       similarityCutoff: 0.8,
-#       writeRelationshipType: 'SIMILAR_TO',
-#       writeProperty: 'similarity'
-#     })
-#     YIELD nodesCompared, relationshipsWritten;
-#     """)
-#
-#     # Ausgabe ähnlicher Bücher für Nutzer mit id=8
-#     books = session.run("""
-#     MATCH (target:User {id: 8})
-#     MATCH (target)-[:SIMILAR_TO]->(sim:User)-[r:RATED]->(book:Book)
-#     WHERE NOT (target)-[:RATED]->(book)
-#     WITH book, avg(r.rating) AS avgRating, count(*) AS votes
-#     ORDER BY avgRating DESC, votes DESC
-#     LIMIT 10
-#     RETURN book.title AS title, avgRating, votes;
-#     """)
-#     print("Ähnliche Bücher:")
-#     for record in books:
-#         print(record)
-#
-# driver.close()

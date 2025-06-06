@@ -11,7 +11,7 @@ driver = GraphDatabase.driver(uri, auth=(user, password))
 # 1. GRAPH SETUP
 # -------------------------
 
-def delete_existing_graph(tx, name="userGraph"):
+def delete_existing_graph_3(tx, name="userGraph"):
     query = f"""
     CALL gds.graph.exists('{name}') YIELD exists
     WITH exists
@@ -132,17 +132,17 @@ def evaluate_recommendations(tx, user_id=8, limit=10):
 def run_full_pipeline():
     with driver.session() as session:
         print("🚮 Lösche vorherige GDS-Projektion...")
-        session.write_transaction(delete_existing_graph)
+        session.execute_write(delete_existing_graph_3)
 
         print("🧱 Erstelle Projektion für Node2Vec...")
-        session.write_transaction(create_projection_node2vec)
+        session.execute_write(create_projection_node2vec)
 
         print("🧠 Generiere Node2Vec Embeddings...")
-        session.write_transaction(run_node2vec, dim=64)
+        session.execute_write(run_node2vec, dim=64)
 
         print("📦 Neu-Projektion nur für Embedding-basierte KNN-Berechnung...")
-        session.write_transaction(delete_existing_graph)
-        session.write_transaction(lambda tx: tx.run("""
+        session.execute_write(delete_existing_graph_3)
+        session.execute_write(lambda tx: tx.run("""
             CALL gds.graph.project(
               'userGraph',
               {
@@ -155,15 +155,15 @@ def run_full_pipeline():
         """))
 
         print("🔍 Starte KNN mit Parametern: topK=10, cutoff=0.75")
-        session.write_transaction(run_knn_write, top_k=10, similarity_cutoff=0.75)
+        session.execute_write(run_knn_write, top_k=10, similarity_cutoff=0.75)
 
         print("📚 Empfohlene Bücher für User 8:")
-        books = session.read_transaction(get_recommended_books, user_id=8)
+        books = session.execute_read(get_recommended_books, user_id=8)
         for book in books:
             print("   ➤", book)
 
         print("📊 Evaluation:")
-        eval_result = session.read_transaction(evaluate_recommendations, user_id=8)
+        eval_result = session.execute_read(evaluate_recommendations, user_id=8)
         print("   ➤ Precision:", eval_result["precision"])
         print("   ➤ Recall:   ", eval_result["recall"])
         print("   ➤ Treffer: ", eval_result["true_positives"])

@@ -1,6 +1,7 @@
 from neo4j import GraphDatabase
 from alg_knn_fastrp import delete_existing_graph_2, create_projection_fastrp, run_fastrp
 from alg_knn_graphsage import check_and_fix_features, project_graphsage_graph, run_graphsage_train, run_graphsage_write
+from alg_knn_node2vec import delete_existing_graph_3, create_projection_node2vec, run_node2vec
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
@@ -98,6 +99,17 @@ def run_pipeline(algorithm="fastrp"):
             print("🧠 Berechne Embeddings mit GraphSAGE: Schreiben...")
             session.execute_write(run_graphsage_write)
 
+        if algorithm == "node2vec":
+            ################# Node2Vec ###################
+            print("🚮 Lösche vorherige GDS-Projektion...")
+            session.execute_write(delete_existing_graph_3)
+
+            print("🧱 Erstelle Projektion für Node2Vec...")
+            session.execute_write(create_projection_node2vec)
+
+            print("🧠 Generiere Node2Vec Embeddings...")
+            session.execute_write(run_node2vec, dim=64)
+
         print("🔍 Überprüfe Länge der Embeddings:")
         stats = session.execute_read(check_embedding_lengths)
         for row in stats:
@@ -121,9 +133,93 @@ def run_pipeline(algorithm="fastrp"):
 
 if __name__ == "__main__":
     run_pipeline("graphsage")
+    # run_pipeline("fastrp")
+    # run_pipeline("node2vec") <-- zu hoher Arbeitsspeicher-Nutzung
 
 # Eine Dummy-Beziehung vorab einfügen:
 # MATCH (a:User), (b:User)
 # WHERE a <> b
 # WITH a, b LIMIT 1
 # MERGE (a)-[:DUMMY]->(b);
+
+# Falls my-sage-model bereits existiert:
+# CALL gds.beta.model.drop('my-sage-model')
+
+
+################################### alter Code #####################################
+# from neo4j import GraphDatabase
+#
+# uri = "bolt://localhost:7687"  # Anpassen
+# user = "neo4j"
+# password = "SuperPasswort"     # Anpassen
+#
+# driver = GraphDatabase.driver(uri, auth=(user, password))
+#
+# def run_query(tx, query, parameters=None):
+#     return list(tx.run(query, parameters or {}))
+#
+# with driver.session() as session:
+#     # 1. Lösche bestehenden GDS-Graphen
+#     session.run("""
+#     CALL gds.graph.exists('userGraph') YIELD exists
+#     WITH exists
+#     CALL apoc.do.when(
+#       exists,
+#       'CALL gds.graph.drop("userGraph") YIELD graphName RETURN graphName',
+#       'RETURN "Graph was not present" AS graphName',
+#       {}
+#     ) YIELD value
+#     RETURN value.graphName;
+#     """)
+#
+#     # 2. GDS-Projektion erstellen
+#     session.run("""
+#     CALL gds.graph.project(
+#       'userGraph',
+#       {
+#         User: {
+#           properties: ['embedding']
+#         }
+#       },
+#       {}
+#     );
+#     """)
+#
+#     # 3. KNN schreiben (ohne Threshold)
+#     session.run("""
+#     CALL gds.knn.write('userGraph', {
+#       nodeProperties: ['embedding'],
+#       topK: 5,
+#       writeRelationshipType: 'SIMILAR_TO',
+#       writeProperty: 'similarity'
+#     })
+#     YIELD nodesCompared, relationshipsWritten;
+#     """)
+#
+#     # Optional: Alternative mit Threshold
+#     session.run("""
+#     CALL gds.knn.write('userGraph', {
+#       nodeProperties: ['embedding'],
+#       topK: 5,
+#       similarityCutoff: 0.8,
+#       writeRelationshipType: 'SIMILAR_TO',
+#       writeProperty: 'similarity'
+#     })
+#     YIELD nodesCompared, relationshipsWritten;
+#     """)
+#
+#     # Ausgabe ähnlicher Bücher für Nutzer mit id=8
+#     books = session.run("""
+#     MATCH (target:User {id: 8})
+#     MATCH (target)-[:SIMILAR_TO]->(sim:User)-[r:RATED]->(book:Book)
+#     WHERE NOT (target)-[:RATED]->(book)
+#     WITH book, avg(r.rating) AS avgRating, count(*) AS votes
+#     ORDER BY avgRating DESC, votes DESC
+#     LIMIT 10
+#     RETURN book.title AS title, avgRating, votes;
+#     """)
+#     print("Ähnliche Bücher:")
+#     for record in books:
+#         print(record)
+#
+# driver.close()
