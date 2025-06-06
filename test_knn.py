@@ -1,5 +1,6 @@
 from neo4j import GraphDatabase
-from alg_knn_wo import delete_existing_graph_2, create_projection_fastrp, run_fastrp
+from alg_knn_fastrp import delete_existing_graph_2, create_projection_fastrp, run_fastrp
+from alg_knn_graphsage import check_and_fix_features, project_graphsage_graph, run_graphsage_train, run_graphsage_write
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
@@ -70,18 +71,32 @@ def check_embedding_lengths(tx, expected_len=embedding_dimension):
     """)
     return result.data()
 
-def run_pipeline():
+def run_pipeline(algorithm="fastrp"):
     with driver.session() as session:
-        ############ aus anderer Datei ########
-        print("🚮 Lösche vorherige GDS-Projektion...")
-        session.execute_write(delete_existing_graph_2)
+        if algorithm == "fastrp":
+            ################# FastRP ###################
+            print("🚮 Lösche vorherige GDS-Projektion...")
+            session.execute_write(delete_existing_graph_2)
 
-        print("🧱 Erstelle Projektion für FastRP...")
-        session.execute_write(create_projection_fastrp)
+            print("🧱 Erstelle Projektion für FastRP...")
+            session.execute_write(create_projection_fastrp)
 
-        print("🧠 Generiere FastRP Embeddings (dim=64)...")
-        session.execute_write(run_fastrp, dim=64)
-        ##############################################
+            print("🧠 Generiere FastRP Embeddings (dim=64)...")
+            session.execute_write(run_fastrp, dim=64)
+        if algorithm == "graphsage":
+            ################# GraphSAGE ###################
+            print("🔍 Prüfe und setze fehlende age-Werte...")
+            session.execute_write(check_and_fix_features)
+
+            print("📦 Projiziere Graph für GraphSAGE...")
+            session.execute_write(project_graphsage_graph)
+
+            print("🧠 Berechne Embeddings mit GraphSAGE: Trainieren...")
+            # Falls bereits existiert: CALL gds.beta.model.drop('my-sage-model') in neo4j Browser
+            session.execute_write(run_graphsage_train)
+
+            print("🧠 Berechne Embeddings mit GraphSAGE: Schreiben...")
+            session.execute_write(run_graphsage_write)
 
         print("🔍 Überprüfe Länge der Embeddings:")
         stats = session.execute_read(check_embedding_lengths)
@@ -105,7 +120,7 @@ def run_pipeline():
     driver.close()
 
 if __name__ == "__main__":
-    run_pipeline()
+    run_pipeline("graphsage")
 
 # Eine Dummy-Beziehung vorab einfügen:
 # MATCH (a:User), (b:User)
