@@ -8,7 +8,7 @@ from neo4j import GraphDatabase
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
-password = "SuperPasswort"  # Anpassen
+password = "SuperPasswort"
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -16,7 +16,7 @@ driver = GraphDatabase.driver(uri, auth=(user, password))
 # 1. GRAPH SETUP
 # -------------------------
 
-def delete_existing_graph_2(tx, name="userGraph"):
+def delete_existing_graph(tx, name="userGraph"):
     query = f"""
     CALL gds.graph.exists('{name}') YIELD exists
     WITH exists
@@ -95,7 +95,7 @@ def run_knn_write(tx, name="userGraph", top_k=5, similarity_cutoff=None):
 # 4. EMPFEHLUNG
 # -------------------------
 
-def get_recommended_books(tx, user_id=8, limit=10):
+def get_recommended_books(tx, user_id=19, limit=10):
     query = """
     MATCH (target:User {id: $userId})
     MATCH (target)-[:SIMILAR_TO]->(sim:User)-[r:RATED]->(book:Book)
@@ -111,7 +111,7 @@ def get_recommended_books(tx, user_id=8, limit=10):
 # 5. EVALUATION
 # -------------------------
 
-def evaluate_recommendations(tx, user_id=8, limit=10):
+def evaluate_recommendations(tx, user_id=19, limit=10):
     recommendations = get_recommended_books(tx, user_id, limit)
     query = """
     MATCH (u:User {id: $userId})-[:RATED]->(b:Book)
@@ -136,40 +136,56 @@ def evaluate_recommendations(tx, user_id=8, limit=10):
 
 def run_full_pipeline():
     with driver.session() as session:
-        print("🚮 Lösche vorherige GDS-Projektion...")
-        session.execute_write(delete_existing_graph_2)
+        print("Lösche vorherige GDS-Projektion...")
+        session.execute_write(delete_existing_graph)
 
-        print("🧱 Erstelle Projektion für FastRP...")
+        print("Erstelle Projektion für FastRP...")
         session.execute_write(create_projection_fastrp)
 
-        print("🧠 Generiere FastRP Embeddings (dim=64)...")
+        print("Generiere FastRP Embeddings...")
         session.execute_write(run_fastrp, dim=64)
 
-        print("📦 Neu-Projektion nur für Embedding-basierte KNN-Berechnung...")
-        session.execute_write(delete_existing_graph_2)
-        session.execute_write(lambda tx: tx.run("""
-            CALL gds.graph.project.cypher(
-              'userGraph',
-              '
-                MATCH (u:User)
-                RETURN id(u) AS id,
-                       coalesce([x IN u.embedding | coalesce(toFloat(x), 0.0)], [0.0, 0.0, 0.0, 0.0]) AS embedding
-              ',
-              'RETURN NULL AS source, NULL AS target',
-              { validateRelationships: false }
+        print("Neu-Projektion nur für Embedding-basierte KNN-Berechnung...")
+        session.execute_write(delete_existing_graph)
+        print("Schreibe mit Dummy-Beziehung...")
+        session.execute_write(lambda tx: tx.run(f"""
+            CALL gds.graph.project(
+                'userGraph',
+                ['User'],
+                {{
+                    DUMMY: {{
+                        type: 'DUMMY',
+                        orientation: 'UNDIRECTED'
+                    }}
+                }},
+                {{
+                    nodeProperties: ['embedding']
+                }}
             );
-        """))
+            """))
+        # session.execute_write(lambda tx: tx.run("""
+        #     CALL gds.graph.project.cypher(
+        #       'userGraph',
+        #       '
+        #         MATCH (u:User)
+        #         RETURN id(u) AS id,
+        #                coalesce([x IN u.embedding | coalesce(toFloat(x), 0.0)], [0.0, 0.0, 0.0, 0.0]) AS embedding
+        #       ',
+        #       'RETURN NULL AS source, NULL AS target',
+        #       { validateRelationships: false }
+        #     );
+        # """))
 
-        print("🔍 Starte KNN mit Parametern: topK=10, cutoff=0.75")
-        session.execute_write(run_knn_write, top_k=10, similarity_cutoff=0.75)
+        print("Starte KNN mit Parametern: topK=10, cutoff=0.75")
+        session.execute_write(run_knn_write, top_k=5, similarity_cutoff=0.75)
 
-        print("📚 Empfohlene Bücher für User 8:")
-        books = session.execute_read(get_recommended_books, user_id=8)
+        print("Empfohlene Bücher für User 19:")
+        books = session.execute_read(get_recommended_books, user_id=19)
         for book in books:
             print("   ➤", book)
 
-        print("📊 Evaluation:")
-        eval_result = session.execute_read(evaluate_recommendations, user_id=8)
+        print("Evaluation:")
+        eval_result = session.execute_read(evaluate_recommendations, user_id=19)
         print("   ➤ Precision:", eval_result["precision"])
         print("   ➤ Recall:   ", eval_result["recall"])
         print("   ➤ Treffer: ", eval_result["true_positives"])

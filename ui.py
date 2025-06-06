@@ -52,18 +52,29 @@ def get_recommendations(user_id, algorithm):
         ORDER BY recommendCount DESC
         LIMIT 3
         """
-    else:  # KNN (dummy logic placeholder)
+    else:
+        # Echter KNN
         query = """
-        MATCH (u:User {id: $userId})-[:RATED]->(b:Book)<-[:RATED]-(other:User)
-        WITH other, COUNT(*) AS common
-        ORDER BY common DESC
-        LIMIT 10
-        MATCH (other)-[r:RATED]->(rec:Book)
-        WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 6
-        RETURN rec.title AS title, rec.author AS author, COUNT(*) AS recommendCount
-        ORDER BY recommendCount DESC
-        LIMIT 3
-        """
+            MATCH (target:User {id: $userId})
+            MATCH (target)-[:SIMILAR_TO]->(sim:User)-[r:RATED]->(book:Book)
+            WHERE NOT (target)-[:RATED]->(book)
+            WITH book, avg(r.rating) AS avgRating, count(*) AS votes
+            ORDER BY avgRating DESC, votes DESC
+            LIMIT 3
+            RETURN book.title AS title, book.author AS author, avgRating, votes
+            """
+        # KNN (dummy logic placeholder)
+        # query = """
+        # MATCH (u:User {id: $userId})-[:RATED]->(b:Book)<-[:RATED]-(other:User)
+        # WITH other, COUNT(*) AS common
+        # ORDER BY common DESC
+        # LIMIT 10
+        # MATCH (other)-[r:RATED]->(rec:Book)
+        # WHERE NOT (u)-[:RATED]->(rec) AND r.rating >= 6
+        # RETURN rec.title AS title, rec.author AS author, COUNT(*) AS recommendCount
+        # ORDER BY recommendCount DESC
+        # LIMIT 3
+        # """
     with driver.session() as session:
         result = session.run(query, userId=user_id)
         return [record.data() for record in result]
@@ -93,12 +104,18 @@ def get_graph_data(user_id, algorithm):
         """
     else:
         query = """
-        MATCH (u1:User {id: $userId})-[:RATED]->(b:Book)<-[:RATED]-(u2:User)
-        WHERE u1.id <> u2.id
-        WITH u1, u2, b
-        MATCH (u2)-[r:RATED]->(book:Book)
-        RETURN u1 AS target, u2, book, r.rating AS rating
-        """
+            MATCH (target:User {id: $userId})-[:SIMILAR_TO]->(sim:User)
+            OPTIONAL MATCH (sim)-[r:RATED]->(b:Book)
+            RETURN target AS u1, sim AS u2, b, r.rating AS rating
+            """
+
+        # query = """
+        # MATCH (u1:User {id: $userId})-[:RATED]->(b:Book)<-[:RATED]-(u2:User)
+        # WHERE u1.id <> u2.id
+        # WITH u1, u2, b
+        # MATCH (u2)-[r:RATED]->(book:Book)
+        # RETURN u1 AS target, u2, book, r.rating AS rating
+        # """
     with driver.session() as session:
         return [record.data() for record in session.run(query, userId=user_id)]
 

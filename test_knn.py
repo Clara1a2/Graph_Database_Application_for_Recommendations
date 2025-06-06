@@ -1,5 +1,5 @@
 from neo4j import GraphDatabase
-from alg_knn_fastrp import delete_existing_graph_2, create_projection_fastrp, run_fastrp
+from alg_knn_fastrp import delete_existing_graph, create_projection_fastrp, run_fastrp
 from alg_knn_graphsage import check_and_fix_features, project_graphsage_graph, run_graphsage_train, run_graphsage_write
 from alg_knn_node2vec import delete_existing_graph_3, create_projection_node2vec, run_node2vec
 
@@ -11,7 +11,7 @@ driver = GraphDatabase.driver(uri, auth=(user, password))
 
 embedding_dimension = 64  # <- anpassen, falls anders trainiert
 
-def delete_existing_graph(tx, name="userGraph"):
+def delete_existing_graph_2(tx, name="userGraph"):
     tx.run(f"""
     CALL gds.graph.exists('{name}') YIELD exists
     WITH exists
@@ -77,7 +77,7 @@ def run_pipeline(algorithm="fastrp"):
         if algorithm == "fastrp":
             ################# FastRP ###################
             print("🚮 Lösche vorherige GDS-Projektion...")
-            session.execute_write(delete_existing_graph_2)
+            session.execute_write(delete_existing_graph)
             print("🧱 Erstelle Projektion für FastRP...")
             session.execute_write(create_projection_fastrp)
             print("🧠 Generiere FastRP Embeddings (dim=64)...")
@@ -109,7 +109,7 @@ def run_pipeline(algorithm="fastrp"):
         for row in stats:
             print(f"   ➤ Länge: {row['len']} → {row['count']} Nutzer")
         print("\n🧹 Lösche alten GDS-Graphen:")
-        session.execute_write(delete_existing_graph)
+        session.execute_write(delete_existing_graph_2)
         print("📦 Projiziere User-Graph mit Dummy-Relation und Embeddings:")
         session.execute_write(create_graph_with_dummy_relation)
         print("🤝 Führe KNN aus (topK=20, cutoff=0.8):")
