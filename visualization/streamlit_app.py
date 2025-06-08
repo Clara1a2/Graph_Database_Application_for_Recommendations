@@ -239,6 +239,3 @@ if st.button("Recommend Books"):
     #os.unlink(path)
 
     st.success(f"Laufzeit für '{algo}'-Empfehlung: {duration:.2f} Sekunden") # Ausgabe der Laufzeit
-
-###### Notes:
-# funktioniert Node2Vec vielleicht bei Linh? (sonst rauslöschen)

@@ -125,7 +125,7 @@ def run_pipeline(algorithm="fastrp"):
 if __name__ == "__main__":
     run_pipeline("graphsage")
     # run_pipeline("fastrp")
-    # run_pipeline("node2vec") <-- zu hoher Arbeitsspeicher-Nutzung
+    # run_pipeline("node2vec") # <-- zu hoher Arbeitsspeicher-Nutzung
 
 # Eine Dummy-Beziehung vorab einfügen:
 # MATCH (a:User), (b:User)
