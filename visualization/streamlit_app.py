@@ -238,4 +238,4 @@ if st.button("Recommend Books"):
     components.html(html_content, height=700, scrolling=True)
     #os.unlink(path)
 
-    st.success(f"Laufzeit für '{algo}'-Empfehlung: {duration:.2f} Sekunden") # Ausgabe der Laufzeit
+    st.success(f"Execution time for '{algo}' recommendation: {duration:.2f} seconds") # Ausgabe der Laufzeit
