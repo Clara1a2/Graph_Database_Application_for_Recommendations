@@ -1,7 +1,7 @@
 from neo4j import GraphDatabase
-from Graph_Database_Application_for_Recommendations.algorithm_knn.alg_knn_fastrp import create_projection_fastrp, run_fastrp
-from Graph_Database_Application_for_Recommendations.algorithm_knn.alg_knn_graphsage import check_and_fix_features, project_graphsage_graph, run_graphsage_train, run_graphsage_write
-from Graph_Database_Application_for_Recommendations.algorithm_knn.alg_knn_node2vec import create_projection_node2vec, run_node2vec
+from Graph_Database_Application_for_Recommendations.Book_Recommendations.Alg_KNN_FastRP import create_projection_fastrp, run_fastrp
+from alg_knn_graphsage import check_and_fix_features, project_graphsage_graph, run_graphsage_train, run_graphsage_write
+from alg_knn_node2vec import create_projection_node2vec, run_node2vec
 
 uri = "bolt://localhost:7687"
 user = "neo4j"
@@ -24,6 +24,10 @@ def delete_existing_graph(tx, name="userGraph"):
     """)
 
 def create_graph_with_dummy_relation(tx):
+    # project a new graph
+    # create dummy relations between the users
+    # add the embeddings
+    # we need relations between the users to compare them
     tx.run(f"""
     CALL gds.graph.project(
         'userGraph',
@@ -41,6 +45,9 @@ def create_graph_with_dummy_relation(tx):
     """)
 
 def run_knn_write(tx, top_k=5, similarity_cutoff=0.8):
+    # calculation of knn
+    # creating the relations 'similar_to'
+    # to know which users are similar
     tx.run("""
     CALL gds.knn.write('userGraph', {
         nodeProperties: ['embedding'],
@@ -52,6 +59,7 @@ def run_knn_write(tx, top_k=5, similarity_cutoff=0.8):
     YIELD nodesCompared, relationshipsWritten;
     """, {"topK": top_k, "cutoff": similarity_cutoff})
 
+###
 def get_similar_books(tx, user_id=8, limit=10):
     result = tx.run("""
     MATCH (target:User {id: $userId})
@@ -86,14 +94,14 @@ def run_pipeline(algorithm="fastrp"):
         if algorithm == "graphsage":
             ################# GraphSAGE ###################
             print("Prüfe und setze fehlende age-Werte...")
-            session.execute_write(check_and_fix_features)
+            session.execute_write(check_and_fix_features) # check if all needed features exists for all nodes
             print("Projiziere Graph für GraphSAGE...")
-            session.execute_write(project_graphsage_graph)
+            session.execute_write(project_graphsage_graph) # project a graphsage graph
             print("Berechne Embeddings mit GraphSAGE: Trainieren...")
             # Falls bereits existiert: CALL gds.beta.model.drop('my-sage-model') in neo4j Browser
-            session.execute_write(run_graphsage_train)
+            session.execute_write(run_graphsage_train) # calculate and create the embeddings
             print("Berechne Embeddings mit GraphSAGE: Schreiben...")
-            session.execute_write(run_graphsage_write)
+            session.execute_write(run_graphsage_write) # saves the embeddings
 
         if algorithm == "node2vec":
             ################# Node2Vec ###################
@@ -104,10 +112,10 @@ def run_pipeline(algorithm="fastrp"):
             print("Generiere Node2Vec Embeddings...")
             session.execute_write(run_node2vec, dim=64)
 
-        print("Überprüfe Länge der Embeddings:")
-        stats = session.execute_read(check_embedding_lengths)
-        for row in stats:
-            print(f"   ➤ Länge: {row['len']} → {row['count']} Nutzer")
+        #print("Überprüfe Länge der Embeddings:")
+        #stats = session.execute_read(check_embedding_lengths)
+        #for row in stats:
+        #    print(f"   ➤ Länge: {row['len']} → {row['count']} Nutzer")
         print("\nLösche alten GDS-Graphen:")
         session.execute_write(delete_existing_graph)
         print("Projiziere User-Graph mit Dummy-Relation und Embeddings:")
@@ -123,8 +131,8 @@ def run_pipeline(algorithm="fastrp"):
     driver.close()
 
 if __name__ == "__main__":
-    run_pipeline("graphsage")
-    # run_pipeline("fastrp")
+    #run_pipeline("graphsage")
+    run_pipeline("fastrp")
     # run_pipeline("node2vec") # <-- zu hoher Arbeitsspeicher-Nutzung
 
 # Eine Dummy-Beziehung vorab einfügen:

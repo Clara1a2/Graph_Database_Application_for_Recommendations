@@ -8,6 +8,7 @@ password = "SuperPasswort"
 driver = GraphDatabase.driver(uri, auth=(username, password))
 
 def check_and_fix_features(tx):
+    # check if all needed features exists for all nodes
     # 1. Durchschnittsalter berechnen
     avg_result = tx.run("""
     MATCH (u:User)
@@ -26,6 +27,7 @@ def check_and_fix_features(tx):
         print("Alle User haben 'age'.")
 
 def project_graphsage_graph(tx):
+    # Project a graph
     # Drop alte Projektion, wenn vorhanden
     tx.run("""
     CALL gds.graph.exists('sageGraph') YIELD exists
@@ -55,6 +57,7 @@ def project_graphsage_graph(tx):
     """)
 
 def run_graphsage_train(tx):
+    # calculate and create the embeddings
     tx.run("""
     CALL gds.beta.graphSage.train('sageGraph', {
       modelName: 'my-sage-model',
@@ -70,6 +73,7 @@ def run_graphsage_train(tx):
     """)
 
 def run_graphsage_write(tx):
+    # saves the embeddings
     tx.run("""
     CALL gds.beta.graphSage.write('sageGraph', {
       modelName: 'my-sage-model',
@@ -78,3 +82,18 @@ def run_graphsage_write(tx):
     })
     YIELD nodePropertiesWritten
     """)
+
+def run_knn_write(tx, top_k=5, similarity_cutoff=0.8):
+    # calculation of knn
+    # creating the relations 'similar_to'
+    # to know which users are similar
+    tx.run("""
+    CALL gds.knn.write('userGraph', {
+        nodeProperties: ['embedding'],
+        topK: $topK,
+        similarityCutoff: $cutoff,
+        writeRelationshipType: 'SIMILAR_TO',
+        writeProperty: 'similarity'
+    })
+    YIELD nodesCompared, relationshipsWritten;
+    """, {"topK": top_k, "cutoff": similarity_cutoff})
