@@ -7,7 +7,7 @@ CALL gds.graph.project.cypher(
   {validateRelationships: true}
 );
 
-//  run the Louvain community detection algorithm
+// Run the Louvain community detection algorithm
 CALL gds.louvain.write(
   'positiveRatingsGraph',
   {
