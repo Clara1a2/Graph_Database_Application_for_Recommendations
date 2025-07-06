@@ -76,19 +76,19 @@ def chunk_dataframe(df, size=100):
 # --- DATA UPLOAD ---
 with GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD)) as driver:
     with driver.session() as session:
-        print("✅ Connected to Neo4j.")
+        print("Connected to Neo4j.")
 
         for user_batch in chunk_dataframe(users_df):
             session.execute_write(load_users, user_batch)
-        print("✅ Users uploaded.")
+        print("Users uploaded.")
 
         for book_batch in chunk_dataframe(books_df):
             session.execute_write(load_books, book_batch)
-        print("✅ Books uploaded.")
+        print("Books uploaded.")
 
         for rating_batch in chunk_dataframe(ratings_df):
             session.execute_write(load_ratings, rating_batch)
-        print("✅ Ratings uploaded.")
+        print("Ratings uploaded.")
 
 
 # --- OPTIONAL: Initial Graph Setup ---
