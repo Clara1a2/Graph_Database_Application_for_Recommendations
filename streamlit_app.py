@@ -3,7 +3,6 @@ import pandas as pd
 import streamlit.components.v1 as components
 from neo4j import GraphDatabase
 import tempfile
-import os
 import time
 
 # Connection configuration for Neo4j
@@ -72,9 +71,9 @@ algo = st.selectbox("Choose recommendation algorithm:", ["KNN", "Community"], in
 
 # Dynamically import the appropriate recommendation module
 if algo == "Community":
-    import recommender_community as rec
+    import recommender.recommender_community as rec
 else:
-    import recommender_knn as rec
+    import recommender.recommender_knn as rec
 
 # Run recommendation when button is clicked
 if st.button("Recommend Books"):
